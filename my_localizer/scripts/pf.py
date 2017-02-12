@@ -35,7 +35,7 @@ class Particle(object):
             x: the x-coordinate of the hypothesis relative to the map frame
             y: the y-coordinate of the hypothesis relative ot the map frame
             theta: the yaw of the hypothesis relative to the map frame
-            w: the particle weight (the class does not ensure that particle weights are normalized
+            w: the particle weight (the class does not ensure that particle weights are normalized)
     """
 
     def __init__(self,x=0.0,y=0.0,theta=0.0,w=1.0):
@@ -43,7 +43,7 @@ class Particle(object):
             x: the x-coordinate of the hypothesis relative to the map frame
             y: the y-coordinate of the hypothesis relative ot the map frame
             theta: the yaw of the hypothesis relative to the map frame
-            w: the particle weight (the class does not ensure that particle weights are normalized """ 
+            w: the particle weight (the class does not ensure that particle weights are normalized """
         self.w = w
         self.theta = theta
         self.x = x
@@ -85,7 +85,7 @@ class ParticleFilter:
         self.base_frame = "base_link"   # the frame of the robot base
         self.map_frame = "map"          # the name of the map coordinate frame
         self.odom_frame = "odom"        # the name of the odometry coordinate frame
-        self.scan_topic = "scan"        # the topic where we will get laser scans from 
+        self.scan_topic = "scan"        # the topic where we will get laser scans from
 
         self.n_particles = 300          # the number of particles to use
 
@@ -112,7 +112,7 @@ class ParticleFilter:
 
         self.particle_cloud = [] 
 
-        self.current_odom_xy_theta = []
+        self.current_odom_xy_theta = []     #current position of ourself in odom frame
 
         # request the map from the map server, the map should be of type nav_msgs/OccupancyGrid
         # TODO: fill in the appropriate service call here.  The resultant map should be assigned be passed
@@ -127,6 +127,7 @@ class ParticleFilter:
             There are two logical methods for this:
                 (1): compute the mean pose
                 (2): compute the most likely pose (i.e. the mode of the distribution)
+                (3): Above a likelihood threshold, compute the mean of those...... track clusters??
         """
         # first make sure that the particle weights are normalized
         self.normalize_particles()
@@ -141,7 +142,7 @@ class ParticleFilter:
             that indicates the change in position and angle between the odometry
             when the particles were last updated and the current odometry.
 
-            msg: this is not really needed to implement this, but is here just in case.
+            msg: this is not really needed to implement this, but is here just in case. <-- ?
         """
         new_odom_xy_theta = convert_pose_to_xy_and_theta(self.odom_pose.pose)
         # compute the change in x,y,theta since our last update
@@ -157,7 +158,7 @@ class ParticleFilter:
             return
 
         # TODO: modify particles using delta
-        # For added difficulty: Implement sample_motion_odometry (Prob Rob p 136)
+        # For added difficulty: Implement sample_motion_odometry (Prob Rob p 136) <-- ?
 
     def map_calc_range(self,x,y,theta):
         """ Difficulty Level 3: implement a ray tracing likelihood model... Let me know if you are interested """
@@ -251,7 +252,7 @@ class ParticleFilter:
                                             frame_id=self.map_frame),
                                   poses=particles_conv))
 
-    def scan_received(self, msg):
+    def scan_received(self, msg): #skipped for now
         """ This is the default logic for what to do when processing scan data.
             Feel free to modify this, however, I hope it will provide a good
             guide.  The input msg is an object of type sensor_msgs/LaserScan """
@@ -269,7 +270,7 @@ class ParticleFilter:
             # this will eventually be published by either Gazebo or neato_node
             return
 
-        # calculate pose of laser relative ot the robot base
+        # calculate pose of laser relative to the robot base
         p = PoseStamped(header=Header(stamp=rospy.Time(0),
                                       frame_id=msg.header.frame_id))
         self.laser_pose = self.tf_listener.transformPose(self.base_frame,p)
@@ -302,7 +303,7 @@ class ParticleFilter:
         self.publish_particles(msg)
 
     def fix_map_to_odom_transform(self, msg):
-        """ This method constantly updates the offset of the map and 
+        """ This method constantly updates the offset of the map and
             odometry coordinate systems based on the latest results from
             the localizer
             TODO: if you want to learn a lot about tf, reimplement this... I can provide
