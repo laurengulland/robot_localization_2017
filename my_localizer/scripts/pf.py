@@ -133,14 +133,14 @@ class ParticleFilter:
         # first make sure that the particle weights are normalized
         self.normalize_particles()
 
-        #pseudo-code, not the right values
         most_common_particles = []
         for particle in self.particle_cloud:
-            if particle.weight > .75:
+            if particle.w: #if the particle exists..... change me later to account for modes!
                 most_common_particles.append(particle)
-        mmPos_x = np.mean(i.x for i in most_common_particles)      #mean of x positions
-        mmPos_y = np.mean(i.y for i in most_common_particles)      #mean of y positions
-        mmPos_th = np.mean(i.theta for i in most_common_particles)    #mean of z positions
+        mmPos_x = np.mean([i.x for i in most_common_particles])        #mean of modes of x positions
+        mmPos_y = np.mean([i.y for i in most_common_particles])        #mean of modes of y positions
+        mmPos_th = np.mean([i.theta for i in most_common_particles])   #mean of modes of z positions
+        # print mmPos_x, mmPos_y, mmPos_th
         orientation_tuple = tf.transformations.quaternion_from_euler(0,0,mmPos_th) #converts theta to quaternion
         self.robot_pose = Pose(position=Point(x=mmPos_x,y=mmPos_y,z=0),orientation=Quaternion(x=orientation_tuple[0], y=orientation_tuple[1], z=orientation_tuple[2], w=orientation_tuple[3]))
 
@@ -172,7 +172,7 @@ class ParticleFilter:
         sigma_y = delta[1]*sigma_scale
         sigma_theta = delta[2]*sigma_scale
 
-        #update each particle using a normal distribution around each delta 
+        #update each particle using a normal distribution around each delta
         for p in self.particle_cloud:
             p.x+=gauss(delta[0],sigma_x)
             p.y+=gauss(delta[1],sigma_y)
@@ -193,8 +193,8 @@ class ParticleFilter:
         """
         # make sure the distribution is normalized
         self.normalize_particles()
-        
-        
+
+
 
     def update_particles_with_laser(self, msg):
         """ Updates the particle weights in response to the scan contained in the msg """
