@@ -110,7 +110,7 @@ class ParticleFilter:
         self.tf_listener = TransformListener()
         self.tf_broadcaster = TransformBroadcaster()
 
-        self.particle_cloud = []
+        self.particle_cloud = [] 
 
         self.current_odom_xy_theta = []     #current position of ourself in odom frame
 
@@ -225,19 +225,31 @@ class ParticleFilter:
         """ Initialize the particle cloud.
             Arguments
             xy_theta: a triple consisting of the mean x, y, and theta (yaw) to initialize the
-                      particle cloud around.  If this input is ommitted, the odometry will be used """
+                      particle cloud around.  If this input is ommitted, the odometry will be used 
+            Particles are created based on a normal distribution around the initial position using standard deviation of sigma for x and y 
+            and sigma_theta for theta"""
         if xy_theta == None:
             xy_theta = convert_pose_to_xy_and_theta(self.odom_pose.pose)
         self.particle_cloud = []
-        # TODO create particles
+
+        sigma = 1
+        sigma_theta = 1
+        for i in range(1,self.n_particles):
+            x = gauss(xy_theta[0],sigma)
+            y = gauss(xy_theta[1],sigma)
+            theta = gauss(xy_theta[2],sigma_theta)
+            self.particle_cloud.append(Particle(x,y,theta))
 
         self.normalize_particles()
         self.update_robot_pose()
 
     def normalize_particles(self):
         """ Make sure the particle weights define a valid distribution (i.e. sum to 1.0) """
-        pass
-        # TODO: implement this
+        weight_sum = 0
+        for p in self.particle_cloud:
+            weight_sum+=p.w
+        for p in self.particle_cloud:
+            p.w /= weight_sum
 
     def publish_particles(self, msg):
         particles_conv = []
