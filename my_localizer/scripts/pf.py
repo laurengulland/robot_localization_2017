@@ -185,8 +185,7 @@ class ParticleFilter:
         """
         # make sure the distribution is normalized
         self.normalize_particles()
-        
-        
+        # TODO: fill out the rest of the implementation
 
     def update_particles_with_laser(self, msg):
         """ Updates the particle weights in response to the scan contained in the msg """
