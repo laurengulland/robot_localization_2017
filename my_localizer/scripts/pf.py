@@ -157,7 +157,19 @@ class ParticleFilter:
             self.current_odom_xy_theta = new_odom_xy_theta
             return
 
-        # TODO: modify particles using delta
+        #modify particles using delta
+        #Create a standard deviation proportional to each delta
+        sigma_scale = 1 # Increase or decrease this based on confidence in odom, can have scales different for theta and x, y
+        sigma_x = delta[0]*sigma_scale
+        sigma_y = delta[1]*sigma_scale
+        sigma_theta = delta[2]*sigma_scale
+
+        #update each particle using a normal distribution around each delta 
+        for p in self.particle_cloud:
+            p.x+=gauss(delta[0],sigma_x)
+            p.y+=gauss(delta[1],sigma_y)
+            p.theta+=gauss(delta[2],sigma_theta)
+
         # For added difficulty: Implement sample_motion_odometry (Prob Rob p 136) <-- ?
 
     def map_calc_range(self,x,y,theta):
@@ -173,7 +185,8 @@ class ParticleFilter:
         """
         # make sure the distribution is normalized
         self.normalize_particles()
-        # TODO: fill out the rest of the implementation
+        
+        
 
     def update_particles_with_laser(self, msg):
         """ Updates the particle weights in response to the scan contained in the msg """
