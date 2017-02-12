@@ -110,7 +110,7 @@ class ParticleFilter:
         self.tf_listener = TransformListener()
         self.tf_broadcaster = TransformBroadcaster()
 
-        self.particle_cloud = [] 
+        self.particle_cloud = []
 
         self.current_odom_xy_theta = []     #current position of ourself in odom frame
 
@@ -125,16 +125,24 @@ class ParticleFilter:
     def update_robot_pose(self):
         """ Update the estimate of the robot's pose given the updated particles.
             There are two logical methods for this:
-                (1): compute the mean pose
+                (1): compute the mean pose <--- currently doing this option
                 (2): compute the most likely pose (i.e. the mode of the distribution)
-                (3): Above a likelihood threshold, compute the mean of those...... track clusters??
+                (3): Above a likelihood threshold, compute the mean of those
+                (4): Differentiate between clusters, compute mean in most likely cluster
         """
         # first make sure that the particle weights are normalized
         self.normalize_particles()
 
-        # TODO: assign the lastest pose into self.robot_pose as a geometry_msgs.Pose object
-        # just to get started we will fix the robot's pose to always be at the origin
-        self.robot_pose = Pose()
+        #pseudo-code, not the right values
+        most_common_particles = []
+        for particle in self.particle_cloud:
+            if particle.weight > .75:
+                most_common_particles.append(particle)
+        mmPos_x = np.mean(i.x for i in most_common_particles)      #mean of x positions
+        mmPos_y = np.mean(i.y for i in most_common_particles)      #mean of y positions
+        mmPos_th = np.mean(i.theta for i in most_common_particles)    #mean of z positions
+        orientation_tuple = tf.transformations.quaternion_from_euler(0,0,mmPos_th) #converts theta to quaternion
+        self.robot_pose = Pose(position=Point(x=mmPos_x,y=mmPos_y,z=0),orientation=Quaternion(x=orientation_tuple[0], y=orientation_tuple[1], z=orientation_tuple[2], w=orientation_tuple[3]))
 
     def update_particles_with_odom(self, msg):
         """ Update the particles using the newly given odometry pose.
@@ -229,8 +237,8 @@ class ParticleFilter:
         """ Initialize the particle cloud.
             Arguments
             xy_theta: a triple consisting of the mean x, y, and theta (yaw) to initialize the
-                      particle cloud around.  If this input is ommitted, the odometry will be used 
-            Particles are created based on a normal distribution around the initial position using standard deviation of sigma for x and y 
+                      particle cloud around.  If this input is ommitted, the odometry will be used
+            Particles are created based on a normal distribution around the initial position using standard deviation of sigma for x and y
             and sigma_theta for theta"""
         if xy_theta == None:
             xy_theta = convert_pose_to_xy_and_theta(self.odom_pose.pose)
