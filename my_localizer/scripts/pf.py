@@ -125,12 +125,20 @@ class ParticleFilter:
     def update_robot_pose(self):
         """ Update the estimate of the robot's pose given the updated particles.
             There are two logical methods for this:
-                (1): compute the mean pose
+                (1): compute the mean pose <--- currently doing this option
                 (2): compute the most likely pose (i.e. the mode of the distribution)
-                (3): Above a likelihood threshold, compute the mean of those...... track clusters??
+                (3): Above a likelihood threshold, compute the mean of those
+                (4): Differentiate between clusters, compute mean in most likely cluster
         """
         # first make sure that the particle weights are normalized
         self.normalize_particles()
+
+        #pseudo-code, not the right values
+        most_common_particles = []
+        for particle in self.particle_cloud:
+            if particle.weight > .75:
+                most_common_particles.append(particle)
+        meanmode_position = np.mean(most_common_particles.pose)
 
         # TODO: assign the lastest pose into self.robot_pose as a geometry_msgs.Pose object
         # just to get started we will fix the robot's pose to always be at the origin
