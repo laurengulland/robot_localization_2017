@@ -88,7 +88,7 @@ class ParticleFilter:
         self.scan_topic = "scan"        # the topic where we will get laser scans from
 
         self.n_particles = 300          # the number of particles to use
-
+        self.num_resamples = self.n_particles/3 #numberr of particles to keep when resampling. The other 2/3 will be particles created via adding noise.
         self.d_thresh = 0.2             # the amount of linear movement before performing an update
         self.a_thresh = math.pi/6       # the amount of angular movement before performing an update
 
@@ -182,7 +182,7 @@ class ParticleFilter:
 
     def map_calc_range(self,x,y,theta):
         """ Difficulty Level 3: implement a ray tracing likelihood model... Let me know if you are interested """
-        # TODO: nothing unless you want to try this alternate likelihood model
+        # TODO: nothing, unless you want to try this alternate likelihood model
         pass
 
     def resample_particles(self):
@@ -193,6 +193,40 @@ class ParticleFilter:
         """
         # make sure the distribution is normalized
         self.normalize_particles()
+
+        #initialize a new cloud to be adding selected particles to
+        new_cloud = []
+        num_top_picks = 10 #ensure the X most likely particles get added to the new cloud.
+        curr_weights = [i.w for i in self.particle_cloud]
+        #Make sure top weighted particles are in new cloud.
+        for i in range(1, num_top_picks):
+            idx = self.particle_cloud.index(max(self.particle_cloud))
+            new_cloud.append(self.particle_cloud[idx])
+            self.particle_cloud.remove(idx)
+            curr_weights.remove(idx)
+
+        #Add other particles at probability-biased "random"
+        self.normalize_particles()
+        curr_weights = [i.w for i in self.particle_cloud]
+        new_cloud.extend(draw_random_sample(self.particle_cloud, curr_weights, self.num_resamples-num_top_picks))
+
+        #set particle cloud to be current, but tripled
+        self.particle_cloud = new_cloud.extend(new_cloud.extend(new_cloud))
+
+        #Add noise: modify particles using delta
+        #TODO: Create deltas for this function
+        #Create a standard deviation proportional to each delta
+        sigma_scale = 1 # Increase or decrease this based on confidence in odom, can have scales different for theta and x, y
+        sigma_x = delta[0]*sigma_scale
+        sigma_y = delta[1]*sigma_scale
+        sigma_theta = delta[2]*sigma_scale
+
+        #update each particle using a normal distribution around each delta
+        for p in self.particle_cloud:
+            p.x+=gauss(delta[0],sigma_x)
+            p.y+=gauss(delta[1],sigma_y)
+            p.theta+=gauss(delta[2],sigma_theta)
+
 
 
 
