@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-""" This is the starter code for the robot localization project """
+""" This is the Judy and Lauren's code for localization project """
 
 import rospy
 
@@ -115,11 +115,13 @@ class ParticleFilter:
         self.current_odom_xy_theta = []     #current position of ourself in odom frame
 
         # request the map from the map server, the map should be of type nav_msgs/OccupancyGrid
-        # TODO: fill in the appropriate service call here.  The resultant map should be assigned be passed
-        #       into the init method for OccupancyField
+        get_map_from_server = rospy.ServiceProxy('static_map', GetMap) # 'static map' is the service that map_server publishes to.
+        self.map = get_map_from_server()
+        print 'got map:' #Do not print the map itself, it is huge
+        # Create our occupancy field to reference later using the map we got
+        self.occupancy_field = OccupancyField(self.map.map)
+        print 'created occupancy field'
 
-        # for now we have commented out the occupancy field initialization until you can successfully fetch the map
-        #self.occupancy_field = OccupancyField(map)
         self.initialized = True
 
     def update_robot_pose(self):
@@ -133,14 +135,14 @@ class ParticleFilter:
         # first make sure that the particle weights are normalized
         self.normalize_particles()
 
-        #pseudo-code, not the right values
         most_common_particles = []
         for particle in self.particle_cloud:
-            if particle.w > .75:
+            if particle.w: #if the particle exists..... change me later to account for modes!
                 most_common_particles.append(particle)
-        mmPos_x = np.mean([i.x for i in most_common_particles])      #mean of x positions
-        mmPos_y = np.mean([i.y for i in most_common_particles])      #mean of y positions
-        mmPos_th = np.mean([i.theta for i in most_common_particles])    #mean of z positions
+        mmPos_x = np.mean([i.x for i in most_common_particles])        #mean of modes of x positions
+        mmPos_y = np.mean([i.y for i in most_common_particles])        #mean of modes of y positions
+        mmPos_th = np.mean([i.theta for i in most_common_particles])   #mean of modes of z positions
+        # print mmPos_x, mmPos_y, mmPos_th
         orientation_tuple = tf.transformations.quaternion_from_euler(0,0,mmPos_th) #converts theta to quaternion
         self.robot_pose = Pose(position=Point(x=mmPos_x,y=mmPos_y,z=0),orientation=Quaternion(x=orientation_tuple[0], y=orientation_tuple[1], z=orientation_tuple[2], w=orientation_tuple[3]))
 
@@ -172,7 +174,7 @@ class ParticleFilter:
         sigma_y = delta[1]*sigma_scale
         sigma_theta = delta[2]*sigma_scale
 
-        #update each particle using a normal distribution around each delta 
+        #update each particle using a normal distribution around each delta
         for p in self.particle_cloud:
             p.x+=gauss(delta[0],sigma_x)
             p.y+=gauss(delta[1],sigma_y)
@@ -193,12 +195,12 @@ class ParticleFilter:
         """
         # make sure the distribution is normalized
         self.normalize_particles()
-        # TODO: fill out the rest of the implementation
+
 
     def update_particles_with_laser(self, msg):
         """ Updates the particle weights in response to the scan contained in the msg """
         # TODO: implement this
-        pass
+
 
     @staticmethod
     def weighted_values(values, probabilities, size):
