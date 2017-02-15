@@ -136,11 +136,11 @@ class ParticleFilter:
         #pseudo-code, not the right values
         most_common_particles = []
         for particle in self.particle_cloud:
-            if particle.weight > .75:
+            if particle.w > .75:
                 most_common_particles.append(particle)
-        mmPos_x = np.mean(i.x for i in most_common_particles)      #mean of x positions
-        mmPos_y = np.mean(i.y for i in most_common_particles)      #mean of y positions
-        mmPos_th = np.mean(i.theta for i in most_common_particles)    #mean of z positions
+        mmPos_x = np.mean([i.x for i in most_common_particles])      #mean of x positions
+        mmPos_y = np.mean([i.y for i in most_common_particles])      #mean of y positions
+        mmPos_th = np.mean([i.theta for i in most_common_particles])    #mean of z positions
         orientation_tuple = tf.transformations.quaternion_from_euler(0,0,mmPos_th) #converts theta to quaternion
         self.robot_pose = Pose(position=Point(x=mmPos_x,y=mmPos_y,z=0),orientation=Quaternion(x=orientation_tuple[0], y=orientation_tuple[1], z=orientation_tuple[2], w=orientation_tuple[3]))
 
@@ -242,6 +242,7 @@ class ParticleFilter:
             and sigma_theta for theta"""
         if xy_theta == None:
             xy_theta = convert_pose_to_xy_and_theta(self.odom_pose.pose)
+        # self.convert_pose_to_xy_and_theta(self.odom_pose.pose)
         self.particle_cloud = []
 
         sigma = 1
