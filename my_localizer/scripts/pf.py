@@ -15,6 +15,7 @@ from tf import TransformListener
 from tf import TransformBroadcaster
 from tf.transformations import euler_from_quaternion, rotation_matrix, quaternion_from_matrix
 from random import gauss
+from scipy.stats import norm
 
 import math
 import time
@@ -88,7 +89,7 @@ class ParticleFilter:
         self.scan_topic = "scan"        # the topic where we will get laser scans from
 
         self.n_particles = 300          # the number of particles to use
-        self.num_resamples = self.n_particles/3 #numberr of particles to keep when resampling. The other 2/3 will be particles created via adding noise.
+        self.num_resamples = 100 #numberr of particles to keep when resampling. The other 2/3 will be particles created via adding noise.
         self.d_thresh = 0.2             # the amount of linear movement before performing an update
         self.a_thresh = math.pi/6       # the amount of angular movement before performing an update
 
@@ -118,6 +119,7 @@ class ParticleFilter:
         get_map_from_server = rospy.ServiceProxy('static_map', GetMap) # 'static map' is the service that map_server publishes to.
         self.map = get_map_from_server()
         print 'got map:' #Do not print the map itself, it is huge
+        
         # Create our occupancy field to reference later using the map we got
         self.occupancy_field = OccupancyField(self.map.map)
         print 'created occupancy field'
@@ -141,7 +143,10 @@ class ParticleFilter:
                 most_common_particles.append(particle)
         mmPos_x = np.mean([i.x for i in most_common_particles])        #mean of modes of x positions
         mmPos_y = np.mean([i.y for i in most_common_particles])        #mean of modes of y positions
+        '''To-Do: Problem with adding angle below: (10 + 350)/2 = 180, but the average of them is 0. So it is better to convert angle
+        into a x and y vector, add those up and convert back to angle''' 
         mmPos_th = np.mean([i.theta for i in most_common_particles])   #mean of modes of z positions
+        
         # print mmPos_x, mmPos_y, mmPos_th
         orientation_tuple = tf.transformations.quaternion_from_euler(0,0,mmPos_th) #converts theta to quaternion
         self.robot_pose = Pose(position=Point(x=mmPos_x,y=mmPos_y,z=0),orientation=Quaternion(x=orientation_tuple[0], y=orientation_tuple[1], z=orientation_tuple[2], w=orientation_tuple[3]))
@@ -200,41 +205,63 @@ class ParticleFilter:
         new_cloud = []
         num_top_picks = 10 #ensure the X most likely particles get added to the new cloud.
         curr_weights = [i.w for i in self.particle_cloud]
+
+        print curr_weights[0:10]
+        
         #Make sure top weighted particles are in new cloud.
         for i in range(1, num_top_picks):
             idx = self.particle_cloud.index(max(self.particle_cloud))
             new_cloud.append(self.particle_cloud[idx])
-            self.particle_cloud.remove(idx)
-            curr_weights.remove(idx)
+            self.particle_cloud.pop(idx) #pop(id) removes the element at the index, remove(x) delete the element x
+            curr_weights.pop(idx)
 
         #Add other particles at probability-biased "random"
         self.normalize_particles()
         curr_weights = [i.w for i in self.particle_cloud]
-        new_cloud.extend(draw_random_sample(self.particle_cloud, curr_weights, self.num_resamples-num_top_picks))
+        new_cloud.extend(ParticleFilter.draw_random_sample(self.particle_cloud, curr_weights, self.num_resamples-num_top_picks-1))
 
         #set particle cloud to be current, but tripled
-        self.particle_cloud = new_cloud.extend(new_cloud.extend(new_cloud))
+        # self.particle_cloud = new_cloud.extend(new_cloud.extend(new_cloud))
+        self.particle_cloud = new_cloud*3
 
         #Add noise: modify particles using delta
-        #TODO: Create deltas for this function
+        #TODO: Create deltas for this function - Judy: We don't really need delta here? we can just define sigma_x, sigma_y and sigma_theta
         #Create a standard deviation proportional to each delta
-        sigma_scale = 1 # Increase or decrease this based on confidence in odom, can have scales different for theta and x, y
-        sigma_x = delta[0]*sigma_scale
-        sigma_y = delta[1]*sigma_scale
-        sigma_theta = delta[2]*sigma_scale
+        sigma_scale = 0.1 # Increase or decrease this based on confidence in odom, can have scales different for theta and x, y
+        sigma_x = sigma_scale
+        sigma_y = sigma_scale
+        sigma_theta = 0.1*sigma_scale
 
         #update each particle using a normal distribution around each delta
         for p in self.particle_cloud:
-            p.x+=gauss(delta[0],sigma_x)
-            p.y+=gauss(delta[1],sigma_y)
-            p.theta+=gauss(delta[2],sigma_theta)
-
+            p.x+=gauss(0,sigma_x)
+            p.y+=gauss(0,sigma_y)
+            p.theta+=gauss(0,sigma_theta)
 
 
     def update_particles_with_laser(self, msg):
-        """ Updates the particle weights in response to the scan contained in the msg """
-        # TODO: implement this
+        """ Updates the particle weights in response to the scan contained in the msg 
+            msg: Laser scan message in base_link frame (technically in base_laser_link, but we can just consider it to be in base_link"""
+        for p in self.particle_cloud[0:2]: #For each particle:
+            prob_sum = 0
+            for i,d in enumerate(msg.ranges): # i is the angle index and d is the distance
+                #Map each laser scan measurement of the particle into a location in x, y, map frame
+                x = p.x + d*math.cos(math.radians(i+p.theta)) #Adding the angle and position of the particle to account for transformation from base_particle to map
+                y = p.y + d*math.sin(math.radians(i+p.theta))
 
+                #give each x,y position into occupancy field and get back a distance to the closest obstacle point
+                closest_dist = self.occupancy_field.get_closest_obstacle_distance(x,y)
+                if (i ==1):
+                    print "got closet dist to particle", closest_dist
+                #Find the probablity of seeing that laser scan at the particle's position
+                p_measurement = norm.pdf(closest_dist,loc = 0, scale = 1) #Using scipy's norm. loc is center, scale is sigma
+                if (i ==1):
+                    print "got p_measurement", p_measurement
+                #Add this probablity to the total probablity of the particle 
+                prob_sum += p_measurement**3
+            #Update the weight of the particles based
+            print "prob sum for a particle", prob_sum
+            p.w = prob_sum/10 #10 is arbituary 
 
     @staticmethod
     def weighted_values(values, probabilities, size):
@@ -297,8 +324,9 @@ class ParticleFilter:
         weight_sum = 0
         for p in self.particle_cloud:
             weight_sum+=p.w
+        print "weight sum", weight_sum
         for p in self.particle_cloud:
-            p.w /= weight_sum
+            p.w = p.w * 1.0 / weight_sum
 
     def publish_particles(self, msg):
         particles_conv = []
@@ -309,7 +337,7 @@ class ParticleFilter:
                                             frame_id=self.map_frame),
                                   poses=particles_conv))
 
-    def scan_received(self, msg): #skipped for now
+    def scan_received(self, msg): 
         """ This is the default logic for what to do when processing scan data.
             Feel free to modify this, however, I hope it will provide a good
             guide.  The input msg is an object of type sensor_msgs/LaserScan """
