@@ -230,8 +230,6 @@ class ParticleFilter:
         # self.normalize_particles()
 
         #Add noise: modify particles using delta
-        #TODO: Create deltas for this function - Judy: We don't really need delta here? we can just define sigma_x, sigma_y and sigma_theta
-        #Lauren - Yeah, I was thinking about this afterwards and it doesn't quite make sense. I think we can definitely simplify to the sigmas.
         #Create a standard deviation proportional to each delta
         sigma_scale = 0.5 # Increase or decrease this based on confidence in odom, can have scales different for theta and x, y
         sigma_x = sigma_scale
