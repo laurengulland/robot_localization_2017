@@ -90,6 +90,8 @@ class ParticleFilter:
 
         self.n_particles = 300          # the number of particles to use
         self.num_resamples = 100        #number of particles to keep when resampling. The other 2/3 will be particles created via adding noise.
+        # self.n_particles = rospy.get_param(~n_particles)  # the number of particles to use
+
         self.d_thresh = 0.2             # the amount of linear movement before performing an update
         self.a_thresh = math.pi/6       # the amount of angular movement before performing an update
 
@@ -215,22 +217,26 @@ class ParticleFilter:
             curr_weights.pop(idx)
 
         #Add other particles at probability-biased "random"
-        self.normalize_particles()
         curr_weights = [i.w for i in self.particle_cloud]
-        new_cloud.extend(ParticleFilter.draw_random_sample(self.particle_cloud, curr_weights, self.num_resamples-num_top_picks-1))
-
+        new_cloud.extend(ParticleFilter.draw_random_sample(self.particle_cloud, curr_weights, self.num_resamples-num_top_picks+1))
+        print "length of new cloud", len(new_cloud)
         #set particle cloud to be current, but tripled
-        # self.particle_cloud = new_cloud.extend(new_cloud.extend(new_cloud))
-        self.particle_cloud = new_cloud*3
+        self.particle_cloud = []
+        for i in range(3):
+            self.particle_cloud.extend(deepcopy(new_cloud))
+
+        print "length of particle cloud", len(self.particle_cloud)
+
+        # self.normalize_particles()
 
         #Add noise: modify particles using delta
         #TODO: Create deltas for this function - Judy: We don't really need delta here? we can just define sigma_x, sigma_y and sigma_theta
         #Lauren - Yeah, I was thinking about this afterwards and it doesn't quite make sense. I think we can definitely simplify to the sigmas.
         #Create a standard deviation proportional to each delta
-        sigma_scale = 0.1 # Increase or decrease this based on confidence in odom, can have scales different for theta and x, y
+        sigma_scale = 0.5 # Increase or decrease this based on confidence in odom, can have scales different for theta and x, y
         sigma_x = sigma_scale
         sigma_y = sigma_scale
-        sigma_theta = 0.1*sigma_scale
+        sigma_theta = sigma_scale
 
         #update each particle using a normal distribution around each delta
         for p in self.particle_cloud:
@@ -251,16 +257,17 @@ class ParticleFilter:
 
                 #give each x,y position into occupancy field and get back a distance to the closest obstacle point
                 closest_dist = self.occupancy_field.get_closest_obstacle_distance(x,y)
-                if (i ==1):
-                    print "got closet dist to particle", closest_dist
+                # if (i ==1):
+                    # print "got closet dist to particle", closest_dist
                 #Find the probablity of seeing that laser scan at the particle's position
                 p_measurement = norm.pdf(closest_dist,loc = 0, scale = 1) #Using scipy's norm. loc is center, scale is sigma
-                if (i ==1):
-                    print "got p_measurement", p_measurement
+
+                # if (i ==1):
+                    # print "got p_measurement", p_measurement
                 #Add this probablity to the total probablity of the particle
                 prob_sum += p_measurement**3
             #Update the weight of the particles based
-            print "prob sum for a particle", prob_sum
+            # print "prob sum for a particle", prob_sum
             p.w = prob_sum/10 #10 is arbituary
 
     @staticmethod
