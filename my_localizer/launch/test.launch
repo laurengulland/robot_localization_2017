@@ -2,6 +2,7 @@
   <!-- Map server -->
   <arg name="map_file"/>
   <arg name="scan_topic" default="stable_scan"/>
+  <arg name="n_particles" default="300"/>
   <node name="map_server" pkg="map_server" type="map_server" args="$(arg map_file)"/>
 
   <!-- Localization -->
