@@ -5,6 +5,7 @@ To run, type the following in terminal
     roslaunch my_localizer test.launch map_file:=path to the yaml file
 """ 
 
+
 import rospy
 
 from std_msgs.msg import Header, String
@@ -91,9 +92,10 @@ class ParticleFilter:
         self.odom_frame = "odom"        # the name of the odometry coordinate frame
         self.scan_topic = "scan"        # the topic where we will get laser scans from
 
+        self.n_particles = 300          # the number of particles to use
+        self.num_resamples = 100        #number of particles to keep when resampling. The other 2/3 will be particles created via adding noise.
         # self.n_particles = rospy.get_param(~n_particles)  # the number of particles to use
-        self.n_particles = 300
-        self.num_resamples = 100 #numberr of particles to keep when resampling. The other 2/3 will be particles created via adding noise.
+
         self.d_thresh = 0.2             # the amount of linear movement before performing an update
         self.a_thresh = math.pi/6       # the amount of angular movement before performing an update
 
@@ -123,7 +125,7 @@ class ParticleFilter:
         get_map_from_server = rospy.ServiceProxy('static_map', GetMap) # 'static map' is the service that map_server publishes to.
         self.map = get_map_from_server()
         print 'got map:' #Do not print the map itself, it is huge
-        
+
         # Create our occupancy field to reference later using the map we got
         self.occupancy_field = OccupancyField(self.map.map)
         print 'created occupancy field'
@@ -147,11 +149,9 @@ class ParticleFilter:
                 most_common_particles.append(particle)
         mmPos_x = np.mean([i.x for i in most_common_particles])        #mean of modes of x positions
         mmPos_y = np.mean([i.y for i in most_common_particles])        #mean of modes of y positions
-        
-        '''TODO: Problem with adding angle below: (10 + 350)/2 = 180, but the average of them is 0. So it is better to convert angle
-        into a x and y vector, add those up and convert back to angle''' 
+        #TODO: Problem with adding angle below: (10 + 350)/2 = 180, but the average of them is 0. So it is better to convert angle into a x and y vector, add those up and convert back to angle
         mmPos_th = np.mean([i.theta for i in most_common_particles])   #mean of modes of z positions
-        
+
         # print mmPos_x, mmPos_y, mmPos_th
         orientation_tuple = tf.transformations.quaternion_from_euler(0,0,mmPos_th) #converts theta to quaternion
         self.robot_pose = Pose(position=Point(x=mmPos_x,y=mmPos_y,z=0),orientation=Quaternion(x=orientation_tuple[0], y=orientation_tuple[1], z=orientation_tuple[2], w=orientation_tuple[3]))
@@ -194,7 +194,7 @@ class ParticleFilter:
 
     def map_calc_range(self,x,y,theta):
         """ Difficulty Level 3: implement a ray tracing likelihood model... Let me know if you are interested """
-        # TODO: nothing, unless you want to try this alternate likelihood model
+        # TO-DO: nothing, unless you want to try this alternate likelihood model
         pass
 
     def resample_particles(self):
@@ -212,7 +212,7 @@ class ParticleFilter:
         curr_weights = [i.w for i in self.particle_cloud]
 
         print curr_weights[0:10]
-        
+
         #Make sure top weighted particles are in new cloud.
         for i in range(1, num_top_picks):
             idx = self.particle_cloud.index(max(self.particle_cloud))
@@ -224,17 +224,17 @@ class ParticleFilter:
         self.normalize_particles()
         curr_weights = [i.w for i in self.particle_cloud]
         new_cloud.extend(ParticleFilter.draw_random_sample(self.particle_cloud, curr_weights, self.num_resamples-num_top_picks+1))
-        # print "length of new cloud", len(new_cloud) 
 
-        #set particle cloud to be current, but tripled, remember to deep copy so as to avoid aliasing!
+        #set particle cloud to be current, but tripled
         self.particle_cloud = []
         for i in range(3):
             self.particle_cloud.extend(deepcopy(new_cloud))
 
         # print "length of particle cloud", len(self.particle_cloud) 
         
+        # self.normalize_particles()
+        
         #Add noise: modify particles using delta
-        #TODO: Create deltas for this function - Judy: We don't really need delta here? we can just define sigma_x, sigma_y and sigma_theta
         #Create a standard deviation proportional to each delta
         sigma_scale = 0.5 # Increase or decrease this based on confidence in odom, can have scales different for theta and x, y
         sigma_x = sigma_scale
@@ -249,7 +249,7 @@ class ParticleFilter:
 
 
     def update_particles_with_laser(self, msg):
-        """ Updates the particle weights in response to the scan contained in the msg 
+        """ Updates the particle weights in response to the scan contained in the msg
             msg: Laser scan message in base_link frame (technically in base_laser_link, but we can just consider it to be in base_link"""
         for p in self.particle_cloud[0:2]: #For each particle:
             prob_sum = 0
@@ -264,13 +264,14 @@ class ParticleFilter:
                     # print "got closet dist to particle", closest_dist
                 #Find the probablity of seeing that laser scan at the particle's position
                 p_measurement = norm.pdf(closest_dist,loc = 0, scale = 1) #Using scipy's norm. loc is center, scale is sigma
+
                 # if (i ==1):
                     # print "got p_measurement", p_measurement
-                #Add this probablity to the total probablity of the particle 
+                #Add this probablity to the total probablity of the particle
                 prob_sum += p_measurement**3
             #Update the weight of the particles based
             # print "prob sum for a particle", prob_sum
-            p.w = prob_sum/10 #10 is arbituary 
+            p.w = prob_sum/10 #10 is arbituary
 
     @staticmethod
     def weighted_values(values, probabilities, size):
@@ -346,7 +347,7 @@ class ParticleFilter:
                                             frame_id=self.map_frame),
                                   poses=particles_conv))
 
-    def scan_received(self, msg): 
+    def scan_received(self, msg):
         """ This is the default logic for what to do when processing scan data.
             Feel free to modify this, however, I hope it will provide a good
             guide.  The input msg is an object of type sensor_msgs/LaserScan """
