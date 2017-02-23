@@ -149,6 +149,7 @@ class ParticleFilter:
                 most_common_particles.append(particle)
         mmPos_x = np.mean([i.x for i in most_common_particles])        #mean of modes of x positions
         mmPos_y = np.mean([i.y for i in most_common_particles])        #mean of modes of y positions
+        
         #TODO: Problem with adding angle below: (10 + 350)/2 = 180, but the average of them is 0. So it is better to convert angle into a x and y vector, add those up and convert back to angle
         mmPos_th = np.mean([i.theta for i in most_common_particles])   #mean of modes of z positions
 
@@ -233,7 +234,7 @@ class ParticleFilter:
         # print "length of particle cloud", len(self.particle_cloud) 
         
         # self.normalize_particles()
-        
+
         #Add noise: modify particles using delta
         #Create a standard deviation proportional to each delta
         sigma_scale = 0.5 # Increase or decrease this based on confidence in odom, can have scales different for theta and x, y
