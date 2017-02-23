@@ -1,6 +1,10 @@
 #!/usr/bin/env python
 
-""" This is Judy and Lauren's code for the localization project """
+""" This is the Judy and Lauren's code for localization project 
+To run, type the following in terminal
+    roslaunch my_localizer test.launch map_file:=path to the yaml file
+""" 
+
 
 import rospy
 
@@ -224,18 +228,19 @@ class ParticleFilter:
             curr_weights.pop(idx)
 
         #Add other particles at probability-biased "random"
+        self.normalize_particles()
         curr_weights = [i.w for i in self.particle_cloud]
         new_cloud.extend(ParticleFilter.draw_random_sample(self.particle_cloud, curr_weights, self.num_resamples-num_top_picks+1))
-        print "length of new cloud", len(new_cloud)
+
         #set particle cloud to be current, but tripled
         self.particle_cloud = []
         for i in range(3):
             self.particle_cloud.extend(deepcopy(new_cloud))
 
-        print "length of particle cloud", len(self.particle_cloud)
-
+        # print "length of particle cloud", len(self.particle_cloud) 
+        
         # self.normalize_particles()
-
+        
         #Add noise: modify particles using delta
         #TODO: Create deltas for this function - Judy: We don't really need delta here? we can just define sigma_x, sigma_y and sigma_theta
         #Lauren - Yeah, I was thinking about this afterwards and it doesn't quite make sense. I think we can definitely simplify to the sigmas.
