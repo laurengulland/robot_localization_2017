@@ -145,11 +145,18 @@ class ParticleFilter:
                 most_common_particles.append(particle)
         mmPos_x = np.mean([i.x for i in most_common_particles])        #mean of modes of x positions
         mmPos_y = np.mean([i.y for i in most_common_particles])        #mean of modes of y positions
+
+        #TODO: This may not work. Need to test (and possibly fix)
+        for particle in most_common_particles:
+            x += cos(particle.theta)    #radian conversion necessary?
+            y += sin(particle.theta)    #radian conversion necessary?
+        average_angle = np.atan2(y, x)  #radian conversion necessary?
+
         #TODO: Problem with adding angle below: (10 + 350)/2 = 180, but the average of them is 0. So it is better to convert angle into a x and y vector, add those up and convert back to angle
-        mmPos_th = np.mean([i.theta for i in most_common_particles])   #mean of modes of z positions
+        # mmPos_th = np.mean([i.theta for i in most_common_particles])   #mean of modes of z positions
 
         # print mmPos_x, mmPos_y, mmPos_th
-        orientation_tuple = tf.transformations.quaternion_from_euler(0,0,mmPos_th) #converts theta to quaternion
+        orientation_tuple = tf.transformations.quaternion_from_euler(0,0,average_angle) #converts theta to quaternion
         self.robot_pose = Pose(position=Point(x=mmPos_x,y=mmPos_y,z=0),orientation=Quaternion(x=orientation_tuple[0], y=orientation_tuple[1], z=orientation_tuple[2], w=orientation_tuple[3]))
 
     def update_particles_with_odom(self, msg):
@@ -230,6 +237,8 @@ class ParticleFilter:
         # self.normalize_particles()
 
         #Add noise: modify particles using delta
+        #TODO: Create deltas for this function - Judy: We don't really need delta here? we can just define sigma_x, sigma_y and sigma_theta
+        #Lauren - Yeah, I was thinking about this afterwards and it doesn't quite make sense. I think we can definitely simplify to the sigmas.
         #Create a standard deviation proportional to each delta
         sigma_scale = 0.5 # Increase or decrease this based on confidence in odom, can have scales different for theta and x, y
         sigma_x = sigma_scale
