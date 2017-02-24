@@ -93,7 +93,7 @@ class ParticleFilter:
         self.scan_topic = "scan"        # the topic where we will get laser scans from
 
         self.n_particles = 300          # the number of particles to use
-        self.num_resamples = 100        #number of particles to keep when resampling. The other 2/3 will be particles created via adding noise.
+        self.num_resamples = self.n_particles/3        #number of particles to keep when resampling. The other 2/3 will be particles created via adding noise.
         # self.n_particles = rospy.get_param(~n_particles)  # the number of particles to use
 
         self.d_thresh = 0.2             # the amount of linear movement before performing an update
@@ -178,7 +178,7 @@ class ParticleFilter:
             old_odom_xy_theta = self.current_odom_xy_theta
             delta = (new_odom_xy_theta[0] - self.current_odom_xy_theta[0],
                      new_odom_xy_theta[1] - self.current_odom_xy_theta[1],
-                     new_odom_xy_theta[2] - self.current_odom_xy_theta[2])
+                     angle_diff(new_odom_xy_theta[2], self.current_odom_xy_theta[2]))
 
             self.current_odom_xy_theta = new_odom_xy_theta
         else:
@@ -198,15 +198,15 @@ class ParticleFilter:
 
         #Create a standard deviation proportional to each delta
         # Increase or decrease the constants below based on confidence in odom, can have scales different for theta and x, y
-        sigma_x = dx
-        sigma_y = dy
-        sigma_theta = dtheta*2
+        sigma_d = d*0.1
+        sigma_theta = dtheta*0.05
 
         #update each particle using a normal distribution around each delta
         for p in self.particle_cloud:
             p.theta+=r1
-            p.x+=gauss(d*math.cos(p.theta),sigma_x)
-            p.y+=gauss(d*math.sin(p.theta),sigma_y)
+            noisy_d = gauss(d,sigma_d)
+            p.x+=noisy_d*math.cos(p.theta)
+            p.y+=noisy_d*math.sin(p.theta)
             p.theta+=gauss(r2,sigma_theta)
 
         # For added difficulty: Implement sample_motion_odometry (Prob Rob p 136) <-- ?
@@ -224,17 +224,17 @@ class ParticleFilter:
         """
         # make sure the distribution is normalized
         self.normalize_particles()
-
+        # return
         #initialize a new cloud to be adding selected particles to
         new_cloud = []
-        num_top_picks = 10 #ensure the X most likely particles get added to the new cloud.
+        num_top_picks = self.num_resamples/2 #ensure the X most likely particles get added to the new cloud.
         curr_weights = [i.w for i in self.particle_cloud]
 
-        print curr_weights[0:10]
+        print curr_weights[0:num_top_picks]
 
         #Make sure top weighted particles are in new cloud.
-        for i in range(1, num_top_picks):
-            idx = self.particle_cloud.index(max(self.particle_cloud))
+        for i in range(0, num_top_picks):
+            idx = curr_weights.index(max(curr_weights))
             new_cloud.append(self.particle_cloud[idx])
             self.particle_cloud.pop(idx) #pop(id) removes the element at the index, remove(x) delete the element x
             curr_weights.pop(idx)
@@ -242,14 +242,13 @@ class ParticleFilter:
         #Add other particles at probability-biased "random"
         self.normalize_particles()
         curr_weights = [i.w for i in self.particle_cloud]
-        new_cloud.extend(ParticleFilter.draw_random_sample(self.particle_cloud, curr_weights, self.num_resamples-num_top_picks+1))
+        new_cloud.extend(ParticleFilter.draw_random_sample(self.particle_cloud, curr_weights, self.num_resamples-num_top_picks))
 
         #set particle cloud to be current, but tripled
         self.particle_cloud = []
         for i in range(3):
             self.particle_cloud.extend(deepcopy(new_cloud))
-
-        # print "length of particle cloud", len(self.particle_cloud) 
+        print "length of particle cloud", len(self.particle_cloud) 
         
         # self.normalize_particles()
 
@@ -257,7 +256,7 @@ class ParticleFilter:
         #TODO: Create deltas for this function - Judy: We don't really need delta here? we can just define sigma_x, sigma_y and sigma_theta
         #Lauren - Yeah, I was thinking about this afterwards and it doesn't quite make sense. I think we can definitely simplify to the sigmas.
         #Create a standard deviation proportional to each delta
-        sigma_scale = 0.2 # Increase or decrease this based on confidence in odom, can have scales different for theta and x, y
+        sigma_scale = 0 # Increase or decrease this based on confidence in odom, can have scales different for theta and x, y
         sigma_x = sigma_scale
         sigma_y = sigma_scale
         sigma_theta = sigma_scale
@@ -276,21 +275,24 @@ class ParticleFilter:
             prob_sum = 0
             for i,d in enumerate(msg.ranges[0:360:5]): # i is the angle index and d is the distance
                 #Map each laser scan measurement of the particle into a location in x, y, map frame
+                if d == 0:
+                    continue
+
                 x = p.x + d*math.cos(math.radians(i)+p.theta) #Adding the angle and position of the particle to account for transformation from base_particle to map
                 y = p.y + d*math.sin(math.radians(i)+p.theta)
 
                 #give each x,y position into occupancy field and get back a distance to the closest obstacle point
                 closest_dist = self.occupancy_field.get_closest_obstacle_distance(x,y)
                 if not closest_dist>0:
-                    return
+                    continue
                 #Find the probablity of seeing that laser scan at the particle's position
-                p_measurement = norm.pdf(closest_dist,loc = 0, scale = 1) #Using scipy's norm. loc is center, scale is sigma
+                p_measurement = norm.pdf(closest_dist,loc = 0, scale = 0.1) #Using scipy's norm. loc is center, scale is sigma
 
                 #Add this probablity to the total probablity of the particle
                 prob_sum += p_measurement**3
             #Update the weight of the particles based
             # print "prob sum for a particle", prob_sum
-            p.w = prob_sum/10 #10 is arbituary
+            p.w = prob_sum 
 
     @staticmethod
     def weighted_values(values, probabilities, size):
@@ -337,8 +339,8 @@ class ParticleFilter:
         # self.convert_pose_to_xy_and_theta(self.odom_pose.pose)
         self.particle_cloud = []
 
-        sigma = 1
-        sigma_theta = 1
+        sigma = 0.2
+        sigma_theta = 0.05
         for i in range(1,self.n_particles):
             x = gauss(xy_theta[0],sigma)
             y = gauss(xy_theta[1],sigma)
