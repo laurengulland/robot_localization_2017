@@ -92,14 +92,16 @@ class ParticleFilter:
         self.odom_frame = "odom"        # the name of the odometry coordinate frame
         self.scan_topic = "scan"        # the topic where we will get laser scans from
 
-        self.n_particles = 300          # the number of particles to use
-        self.num_resamples = self.n_particles/3        #number of particles to keep when resampling. The other 2/3 will be particles created via adding noise.
+        self.n_particles = 100          # the number of particles to use
+        self.select_particle_ratio = 10
+        self.num_resamples = self.n_particles/self.select_particle_ratio    #number of particles to keep when resampling. The other 2/3 will be particles created via adding noise.
         # self.n_particles = rospy.get_param(~n_particles)  # the number of particles to use
 
+        #Good d_thresh: 0.2
         self.d_thresh = 0.2             # the amount of linear movement before performing an update
         self.a_thresh = math.pi/6       # the amount of angular movement before performing an update
 
-        self.laser_max_distance = 2.0   # maximum penalty to assess in the likelihood field model
+        self.laser_max_distance = 2.5   # maximum penalty to assess in the likelihood field model
 
         # TODO: define additional constants if needed
 
@@ -142,23 +144,35 @@ class ParticleFilter:
         """
         # first make sure that the particle weights are normalized
         self.normalize_particles()
+        choose = "mean"
+        if choose =="mode":
+            curr_weights = [i.w for i in self.particle_cloud]
+            idx = curr_weights.index(max(curr_weights))
+            mmPos_x = self.particle_cloud[idx].x
+            mmPos_y = self.particle_cloud[idx].y
+            average_angle = self.particle_cloud[idx].theta
 
-        most_common_particles = []
-        for particle in self.particle_cloud:
-            if particle.w: #if the particle exists..... change me later to account for modes!
-                most_common_particles.append(particle)
-        mmPos_x = np.mean([i.x for i in most_common_particles])        #mean of modes of x positions
-        mmPos_y = np.mean([i.y for i in most_common_particles])        #mean of modes of y positions
+        # #Make sure top weighted particles are in new cloud.
+        # for i in range(0, self.num_resamples):
+        #     most_common_particles.append(self.particle_cloud[idx])
+        #     curr_weights.pop(idx)
+        elif choose == "mean":
+            most_common_particles = []
+            for particle in self.particle_cloud:
+                if particle.w: #if the particle exists..... change me later to account for modes!
+                    most_common_particles.append(particle)
+            mmPos_x = np.mean([i.x for i in most_common_particles])        #mean of modes of x positions
+            mmPos_y = np.mean([i.y for i in most_common_particles])        #mean of modes of y positions
 
-        angle_x = 0
-        angle_y = 0
-        #TODO: This may not work. Need to test (and possibly fix)
-        for particle in most_common_particles:
-            angle_x += math.cos(particle.theta)    #particle.theta is in radians
-            angle_y += math.sin(particle.theta)    #particle.theta is in radians
-        angle_x/=len(most_common_particles)
-        angle_y/=len(most_common_particles)
-        average_angle = math.atan2(angle_y, angle_x)  
+            angle_x = 0
+            angle_y = 0
+
+            for particle in most_common_particles:
+                angle_x += math.cos(particle.theta)    #particle.theta is in radians
+                angle_y += math.sin(particle.theta)    #particle.theta is in radians
+            angle_x/=len(most_common_particles)
+            angle_y/=len(most_common_particles)
+            average_angle = math.atan2(angle_y, angle_x)  
 
         # print mmPos_x, mmPos_y, average_angle
         orientation_tuple = tf.transformations.quaternion_from_euler(0,0,average_angle) #converts theta to quaternion
@@ -198,8 +212,8 @@ class ParticleFilter:
 
         #Create a standard deviation proportional to each delta
         # Increase or decrease the constants below based on confidence in odom, can have scales different for theta and x, y
-        sigma_d = d*0.1
-        sigma_theta = dtheta*0.05
+        sigma_d = d*0.2 #Good constant: 0.2
+        sigma_theta = dtheta*0.15 #good constant: 0.15
 
         #update each particle using a normal distribution around each delta
         for p in self.particle_cloud:
@@ -246,20 +260,19 @@ class ParticleFilter:
 
         #set particle cloud to be current, but tripled
         self.particle_cloud = []
-        for i in range(3):
+        for i in range(self.select_particle_ratio):
             self.particle_cloud.extend(deepcopy(new_cloud))
         print "length of particle cloud", len(self.particle_cloud) 
         
         # self.normalize_particles()
 
         #Add noise: modify particles using delta
-        #TODO: Create deltas for this function - Judy: We don't really need delta here? we can just define sigma_x, sigma_y and sigma_theta
-        #Lauren - Yeah, I was thinking about this afterwards and it doesn't quite make sense. I think we can definitely simplify to the sigmas.
         #Create a standard deviation proportional to each delta
-        sigma_scale = 0 # Increase or decrease this based on confidence in odom, can have scales different for theta and x, y
+        #Good sigma_scale: 0.2
+        sigma_scale = 0.2 # Increase or decrease this based on confidence in odom, can have scales different for theta and x, y
         sigma_x = sigma_scale
         sigma_y = sigma_scale
-        sigma_theta = sigma_scale
+        sigma_theta = sigma_scale*0.5 #Good multiplier: 0.5
 
         #update each particle using a normal distribution around each delta
         for p in self.particle_cloud:
@@ -273,11 +286,11 @@ class ParticleFilter:
             msg: Laser scan message in base_link frame (technically in base_laser_link, but we can just consider it to be in base_link"""
         for p in self.particle_cloud: #For each particle:
             prob_sum = 0
-            for i,d in enumerate(msg.ranges[0:360:5]): # i is the angle index and d is the distance
+            # for i,d in enumerate(msg.ranges[0:360:2]): # i is the angle index and d is the distance
+            for i,d in enumerate(msg.ranges):
                 #Map each laser scan measurement of the particle into a location in x, y, map frame
                 if d == 0:
-                    continue
-
+                    continue #Got an invalid measurement
                 x = p.x + d*math.cos(math.radians(i)+p.theta) #Adding the angle and position of the particle to account for transformation from base_particle to map
                 y = p.y + d*math.sin(math.radians(i)+p.theta)
 
@@ -286,8 +299,8 @@ class ParticleFilter:
                 if not closest_dist>0:
                     continue
                 #Find the probablity of seeing that laser scan at the particle's position
-                p_measurement = norm.pdf(closest_dist,loc = 0, scale = 0.1) #Using scipy's norm. loc is center, scale is sigma
-
+                p_measurement = norm.pdf(closest_dist,loc = 0, scale = 0.005) #Using scipy's norm. loc is center, scale is sigma
+                #Good p_measurement standard deviation: 0.01
                 #Add this probablity to the total probablity of the particle
                 prob_sum += p_measurement**3
             #Update the weight of the particles based
@@ -339,8 +352,8 @@ class ParticleFilter:
         # self.convert_pose_to_xy_and_theta(self.odom_pose.pose)
         self.particle_cloud = []
 
-        sigma = 0.2
-        sigma_theta = 0.05
+        sigma = 0.2 #Good sigma: 0.2
+        sigma_theta = 0.1 #good sigma_theta: 0.1
         for i in range(1,self.n_particles):
             x = gauss(xy_theta[0],sigma)
             y = gauss(xy_theta[1],sigma)
