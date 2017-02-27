@@ -1,10 +1,10 @@
 **your ROS package create a file to hold your project writeup. Any format is fine (markdown, word, pdf, etc.). Your writeup should touch on the following topics:**
-1. What was the goal of your project?
-2. How did you solve the problem? (Note: this doesn't have to be super-detailed, you should try to explain what you did at a high-level so that others in the class could reasonably understand what you did).
-3. Describe a design decision you had to make when working on your project and what you ultimately did (and why)? These design decisions could be particular choices for how you implemented some part of an algorithm or perhaps a decision regarding which of two external packages to use in your project.
-4. What if any challenges did you face along the way?
-5. What would you do to improve your project if you had more time?
-6. Did you learn any interesting lessons for future robotic programming projects? These could relate to working on robotics projects in teams, working on more open-ended (and longer term) problems, or any other relevant topic.
+  ~~1. What was the goal of your project?~~
+  2. How did you solve the problem? (Note: this doesn't have to be super-detailed, you should try to explain what you did at a high-level so that others in the class could reasonably understand what you did).
+  ~~3. Describe a design decision you had to make when working on your project and what you ultimately did (and why)? These design decisions could be particular choices for how you implemented some part of an algorithm or perhaps a decision regarding which of two external packages to use in your project.~~
+  ~~4. What if any challenges did you face along the way?~~
+  ~~5. What would you do to improve your project if you had more time?~~
+  6. Did you learn any interesting lessons for future robotic programming projects? These could relate to working on robotics projects in teams, working on more open-ended (and longer term) problems, or any other relevant topic.
 
 
 # Project Overview
@@ -25,7 +25,7 @@ One thing we would have liked to work on to take this one step further is implem
 ![Clustering Problems](https://github.com/laurengulland/robot_localization_2017/blob/master/my_localizer/videos/particle_filter_cluster.png)
 
 ## Adapting to Inaccurate Starting Positions
-One additional feature that we're proud of is our ability to recover from an inaccurate starting position. In the gif below, you can see that despite being given a very incorrect heading and a somewhat incorrect x-y position, the model recovers well in about 5 seconds by scattering particles much more randomly until they start returning higher confidence in their placement, and then honing down to a more reasonable amount of positional noise when the model is more confident it's in the right place.
+One additional feature that we were interested in is the ability to recover from an inaccurate starting position. In the gif below, you can see that despite being given a very incorrect heading and a mildly incorrect x-y position, the model recovers well in about 5 seconds by scattering particles much more randomly until they start returning higher confidence in their placement, and then honing down to a more reasonable amount of positional noise when the model is more confident it's in the right place.
 ![Recovering from an inaccurate initial position](https://github.com/laurengulland/robot_localization_2017/blob/master/my_localizer/videos/ac109_1_bad_initial.gif "animation")
 
 # Process, Lessons, and Improvements
@@ -33,3 +33,5 @@ One additional feature that we're proud of is our ability to recover from an ina
 One challenge we ran into along the way was making sure our static and dynamic coordinate transforms were correct. This should have been a small thing, but definitely tripped us up because we weren't actively looking for it or thinking about it when writing our code initially, so we didn't get it quite right. Thankfully, with a bit of help, we got it working really well, but we should have been more aware of all the things we would have to be juggling when starting to dive into code development. 
 
 In addition to the improvement of cluster tracking mentioned above, we would have liked to dive more into getting our own map working. We created our own map and bag file to throw a different set of data at our model to see how it responds, but unfortunately couldn't get that working. We think that just requires some more debugging and understanding of ROSservices, which will hopefully be something we can learn in the future!
+
+_Lessons Learned?_
