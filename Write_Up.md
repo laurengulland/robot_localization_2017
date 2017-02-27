@@ -33,5 +33,5 @@ In addition to the improvement of cluster tracking mentioned above, we would hav
 We also would have liked to make our model responsive to not having an initial pose estimate. We currently rely on a decently-good approximation of initial pose, but it would have been interesting to get the model to acknowledge when it's completely off and start guessing particles more and more randomly across the map until it self-corrected.
 
 
-#Animation
+#Recovering from an inaccurate initial position
 ![Recovering from an inaccurate initial position](https://github.com/laurengulland/robot_localization_2017/blob/master/my_localizer/videos/ac109_1_bad_initial.gif "animation")
