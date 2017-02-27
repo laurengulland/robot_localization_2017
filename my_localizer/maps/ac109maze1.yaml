@@ -1,4 +1,4 @@
-image: /home/laurengulland/ac109maze1.pgm
+image: ac109maze1.pgm
 resolution: 0.020000
 origin: [-5.000000, -15.880000, 0.000000]
 negate: 0

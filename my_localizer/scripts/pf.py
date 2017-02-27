@@ -103,8 +103,6 @@ class ParticleFilter:
 
         self.laser_max_distance = 2.5   # maximum penalty to assess in the likelihood field model
 
-        # TODO: define additional constants if needed
-
         # Setup pubs and subs
         self.robot_pose_pub = rospy.Publisher("robot_pose", Pose, queue_size=10)
         # pose_listener responds to selection of a new approximate robot location (for instance using rviz)
@@ -152,7 +150,7 @@ class ParticleFilter:
             mmPos_y = self.particle_cloud[idx].y
             average_angle = self.particle_cloud[idx].theta
 
-        # #Make sure top weighted particles are in new cloud.
+        # #Code to use the mean of the most likely particles: 
         # for i in range(0, self.num_resamples):
         #     most_common_particles.append(self.particle_cloud[idx])
         #     curr_weights.pop(idx)
@@ -205,15 +203,15 @@ class ParticleFilter:
         dtheta = delta[2]
 
         angle_travel = math.atan2(dy,dx)
-        r1 = angle_travel-self.current_odom_xy_theta[2]
-        r2 = dtheta-r1
+        r1 = angle_travel-self.current_odom_xy_theta[2]   #Rotation 1 to face toward the direction of movement
+        r2 = dtheta-r1  #Rotation 2 to final theta
         d = math.sqrt(dy**2+dx**2)
         print "r1 and r2:", r1, r2
 
         #Create a standard deviation proportional to each delta
         # Increase or decrease the constants below based on confidence in odom, can have scales different for theta and x, y
-        sigma_d = d*0.2 #Good constant: 0.2
-        sigma_theta = dtheta*0.15 #good constant: 0.15
+        sigma_d = d*0.3 #Good constant: 0.2
+        sigma_theta = dtheta*0.5 #good constant: 0.15
 
         #update each particle using a normal distribution around each delta
         for p in self.particle_cloud:
@@ -297,10 +295,10 @@ class ParticleFilter:
                 #give each x,y position into occupancy field and get back a distance to the closest obstacle point
                 closest_dist = self.occupancy_field.get_closest_obstacle_distance(x,y)
                 if not closest_dist>0:
-                    continue
+                    continue #Ignore nans
                 #Find the probablity of seeing that laser scan at the particle's position
                 p_measurement = norm.pdf(closest_dist,loc = 0, scale = 0.005) #Using scipy's norm. loc is center, scale is sigma
-                #Good p_measurement standard deviation: 0.01
+                #Good p_measurement standard deviation: 0.005
                 #Add this probablity to the total probablity of the particle
                 prob_sum += p_measurement**3
             #Update the weight of the particles based
@@ -352,8 +350,8 @@ class ParticleFilter:
         # self.convert_pose_to_xy_and_theta(self.odom_pose.pose)
         self.particle_cloud = []
 
-        sigma = 0.2 #Good sigma: 0.2
-        sigma_theta = 0.1 #good sigma_theta: 0.1
+        sigma = 1 #Good sigma: 0.2
+        sigma_theta = 1 #good sigma_theta: 0.1
         for i in range(1,self.n_particles):
             x = gauss(xy_theta[0],sigma)
             y = gauss(xy_theta[1],sigma)
