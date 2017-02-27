@@ -48,7 +48,7 @@ Once each particle has been updated with the robot's odom readings, we add noise
 
 ## Adapting to Inaccurate Starting Positions
 One additional feature that we were interested in is the ability to recover from an inaccurate starting position. In the gif below, you can see that despite being given a very incorrect heading and a mildly incorrect x-y position, the model recovers well in about 5 seconds by scattering particles much more randomly until they start returning higher confidence in their placement, and then honing down to a more reasonable amount of positional noise when the model is more confident it's in the right place.
-![Recovering from an inaccurate initial position](https://github.com/laurengulland/robot_localization_2017/blob/master/my_localizer/videos/ac109_1_bad_initial.gif "animation")
+![Recovering from an inaccurate initial position](https://github.com/laurengulland/robot_localization_2017/blob/master/my_localizer/videos/ac109_1_badinitial_cropped.gif "animation")
 
 # Project Reflection
 
