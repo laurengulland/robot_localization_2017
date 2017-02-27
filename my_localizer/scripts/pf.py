@@ -93,9 +93,8 @@ class ParticleFilter:
         self.scan_topic = "scan"        # the topic where we will get laser scans from
 
         self.n_particles = 100          # the number of particles to use
-        self.select_particle_ratio = 10
-        self.num_resamples = self.n_particles/self.select_particle_ratio    #number of particles to keep when resampling. The other 2/3 will be particles created via adding noise.
-        # self.n_particles = rospy.get_param(~n_particles)  # the number of particles to use
+        self.select_particle_ratio = 10  # The ratio of total particles to selected particles in each resample
+        self.num_resamples = self.n_particles/self.select_particle_ratio    #number of particles to keep when resampling. 
 
         #Good d_thresh: 0.2
         self.d_thresh = 0.2             # the amount of linear movement before performing an update
@@ -124,7 +123,7 @@ class ParticleFilter:
         # request the map from the map server, the map should be of type nav_msgs/OccupancyGrid
         get_map_from_server = rospy.ServiceProxy('static_map', GetMap) # 'static map' is the service that map_server publishes to.
         self.map = get_map_from_server()
-        print 'got map:' #Do not print the map itself, it is huge
+        print 'got map' #Do not print the map itself, it is huge
 
         # Create our occupancy field to reference later using the map we got
         self.occupancy_field = OccupancyField(self.map.map)
@@ -142,19 +141,22 @@ class ParticleFilter:
         """
         # first make sure that the particle weights are normalized
         self.normalize_particles()
-        choose = "mean"
+        choose = "mean"  #Which strategy to use 
+
         if choose =="mode":
+            #Use the pose of the most likely particle
             curr_weights = [i.w for i in self.particle_cloud]
             idx = curr_weights.index(max(curr_weights))
             mmPos_x = self.particle_cloud[idx].x
             mmPos_y = self.particle_cloud[idx].y
             average_angle = self.particle_cloud[idx].theta
 
-        # #Code to use the mean of the most likely particles: 
-        # for i in range(0, self.num_resamples):
-        #     most_common_particles.append(self.particle_cloud[idx])
-        #     curr_weights.pop(idx)
+            # #Code to use the mean of the most likely particles: 
+            # for i in range(0, self.num_resamples):
+            #     most_common_particles.append(self.particle_cloud[idx])
+            #     curr_weights.pop(idx)
         elif choose == "mean":
+            #Use the mean of all particles:
             most_common_particles = []
             for particle in self.particle_cloud:
                 if particle.w: #if the particle exists..... change me later to account for modes!
@@ -164,7 +166,8 @@ class ParticleFilter:
 
             angle_x = 0
             angle_y = 0
-
+            #Can not just average angles because (350, 10) would give 180. Thus, converting them to x,y
+            #and adding up x and y instead then converting back
             for particle in most_common_particles:
                 angle_x += math.cos(particle.theta)    #particle.theta is in radians
                 angle_y += math.sin(particle.theta)    #particle.theta is in radians
@@ -172,7 +175,6 @@ class ParticleFilter:
             angle_y/=len(most_common_particles)
             average_angle = math.atan2(angle_y, angle_x)  
 
-        # print mmPos_x, mmPos_y, average_angle
         orientation_tuple = tf.transformations.quaternion_from_euler(0,0,average_angle) #converts theta to quaternion
         self.robot_pose = Pose(position=Point(x=mmPos_x,y=mmPos_y,z=0),orientation=Quaternion(x=orientation_tuple[0], y=orientation_tuple[1], z=orientation_tuple[2], w=orientation_tuple[3]))
 
@@ -202,18 +204,18 @@ class ParticleFilter:
         dy = delta[1]
         dtheta = delta[2]
 
-        angle_travel = math.atan2(dy,dx)
+        #Figure out how much the robot moved relative to its original angle
+        angle_travel = math.atan2(dy,dx) #Angle of travel wrpt odom frame
         r1 = angle_travel-self.current_odom_xy_theta[2]   #Rotation 1 to face toward the direction of movement
         r2 = dtheta-r1  #Rotation 2 to final theta
-        d = math.sqrt(dy**2+dx**2)
-        print "r1 and r2:", r1, r2
+        d = math.sqrt(dy**2+dx**2) #Distance travelled
 
         #Create a standard deviation proportional to each delta
         # Increase or decrease the constants below based on confidence in odom, can have scales different for theta and x, y
         sigma_d = d*0.3 #Good constant: 0.2
         sigma_theta = dtheta*0.5 #good constant: 0.15
 
-        #update each particle using a normal distribution around each delta
+        #update each particle using a normal distribution
         for p in self.particle_cloud:
             p.theta+=r1
             noisy_d = gauss(d,sigma_d)
@@ -256,16 +258,14 @@ class ParticleFilter:
         curr_weights = [i.w for i in self.particle_cloud]
         new_cloud.extend(ParticleFilter.draw_random_sample(self.particle_cloud, curr_weights, self.num_resamples-num_top_picks))
 
-        #set particle cloud to be current, but tripled
+        #set particle cloud to be current, but multiplied
         self.particle_cloud = []
         for i in range(self.select_particle_ratio):
             self.particle_cloud.extend(deepcopy(new_cloud))
-        print "length of particle cloud", len(self.particle_cloud) 
-        
-        # self.normalize_particles()
 
-        #Add noise: modify particles using delta
-        #Create a standard deviation proportional to each delta
+        print "length of particle cloud", len(self.particle_cloud) 
+
+        #Add noise: modify particles using sigma
         #Good sigma_scale: 0.2
         sigma_scale = 0.2 # Increase or decrease this based on confidence in odom, can have scales different for theta and x, y
         sigma_x = sigma_scale
@@ -301,8 +301,7 @@ class ParticleFilter:
                 #Good p_measurement standard deviation: 0.005
                 #Add this probablity to the total probablity of the particle
                 prob_sum += p_measurement**3
-            #Update the weight of the particles based
-            # print "prob sum for a particle", prob_sum
+            #Update the weight of the particles
             p.w = prob_sum 
 
     @staticmethod
@@ -347,11 +346,10 @@ class ParticleFilter:
             and sigma_theta for theta"""
         if xy_theta == None:
             xy_theta = convert_pose_to_xy_and_theta(self.odom_pose.pose)
-        # self.convert_pose_to_xy_and_theta(self.odom_pose.pose)
         self.particle_cloud = []
 
-        sigma = 1 #Good sigma: 0.2
-        sigma_theta = 1 #good sigma_theta: 0.1
+        sigma = 1 
+        sigma_theta = 1 
         for i in range(1,self.n_particles):
             x = gauss(xy_theta[0],sigma)
             y = gauss(xy_theta[1],sigma)
